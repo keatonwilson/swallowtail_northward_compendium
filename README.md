@@ -1,9 +1,9 @@
 # Northward range expansion and limitations in the Giant Swallowtail Butterfly  
 
 
-[![Binder](https://mybinder.org/v2/gh/keatonwilson/swallowtail_northward_compendium.git/master?urlpath=rstudio)
+[![Binder](http://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/keatonwilson/swallowtail_northward_compendium/master?urlpath=rstudio)  
 
-[![Build Status](https://travis-ci.com/keatonwilson/swallowtail_northward_compendium.svg?branch=master)
+[![Build Status](https://travis-ci.com/keatonwilson/swallowtail_northward_compendium.svg?branch=master)  
 
 - Authors: J. Keaton Wilson, Nicolas Casajus, Dominique Berteaux, Rebecca Hutchison, Greg A. Breed, Kent P. McFarland, Maxim Larivée, Kathleen L. Prudic  
 
