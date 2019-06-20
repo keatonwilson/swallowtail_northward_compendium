@@ -40,7 +40,6 @@ Depends:
     viridis
 Remotes: 
     github::rvalavi/blockCV,
-    github::bobmuscarella/ENMeval,
-    github::ropensci/spocc
+    github::bobmuscarella/ENMeval
 Encoding: UTF-8
 LazyData: true

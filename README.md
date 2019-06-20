@@ -3,7 +3,6 @@
 
 [![Binder](http://mybinder.org/badge.svg)](https://mybinder.org/v2/gh/keatonwilson/swallowtail_northward_compendium/master?urlpath=rstudio)  
 
-[![Build Status](https://travis-ci.com/keatonwilson/swallowtail_northward_compendium.svg?branch=master)  
 
 - Authors: J. Keaton Wilson, Nicolas Casajus, Dominique Berteaux, Rebecca Hutchison, Greg A. Breed, Kent P. McFarland, Maxim Larivée, Kathleen L. Prudic  
 
@@ -19,7 +18,5 @@
 This repository is organized as a reproducible research compendium. 
 Click the ![Binder](http://mybinder.org/badge.svg) button above to explore in an interactive RStudio session. Binder uses [rocker-project.org](https://rocker-project.org) Docker images to ensure a consistent and reproducible computational environment.  These Docker images can also be used locally.  
 
-To explore the code locally, clone or download this repository into RStudio or your perferred environment and install the compendium by running `devtools::install()`.  To install additional dependencies used only in formatting the figures, use `devtools::install(dep=TRUE)`.  
+To explore the code locally, clone or download this repository into RStudio or your preferred environment and install the compendium by running `devtools::install()`.  To install additional dependencies used only in formatting the figures, use `devtools::install(dep=TRUE)`.  
 
-
-This compendium is checked by Travis-CI continuous integration.  Click the ![Build Status](https://travis-ci.org/keatonwilson/swallowtail_northward_compendium.svg?branch=master) button above for details.
