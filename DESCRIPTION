@@ -11,11 +11,9 @@ Authors@R:
 Description: A compendium that outlines a project and manuscript detailing the northward range expansion of the Giant Swallowtail butterfly.
 License: 
 Depends: 
-    blockCV,
     daymetr,
     dismo,
     dplyr,
-    ENMeval,
     FedData,
     ggmap,
     ggpubr,
@@ -41,5 +39,9 @@ Depends:
     tidync,
     tidyverse,
     viridis
+Remotes: 
+    github::rvalavi/blockCV,
+    github::bobmuscarella/ENMeval,
+    github::ropensci/spocc
 Encoding: UTF-8
 LazyData: true

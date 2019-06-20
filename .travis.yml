@@ -3,24 +3,3 @@
 
 language: R
 cache: packages
-script: 
-  - travis_wait 30 R -e 'rmarkdown::render("appendix/appendixA.Rmd")'
-  - travis_wait 30 R -e 'rmarkdown::render("appendix/appendixB.Rmd")'
-  - R -e 'rmarkdown::render("manuscripts/manuscript.Rmd")'
-  
-## Travis lacks enough memory to handle appendices
-## test that all .Rmd files can render 
-#  - R -e 'lapply(list.files(pattern=".*.Rmd", recursive=TRUE), rmarkdown::render)'
-## Optionally check linting  
-#  - R -e 'lapply(list.files(pattern=".*.Rmd", recursive=TRUE), function(x) testthat::expect_length(lintr::lint(x),0))'
-
-
-## Alternate recipe: use Docker instead of R travis
-#sudo: required
-#services:
-#  - docker
-#script:
-## Test on locked version
-#  - docker run -ti -v $(pwd):/home/rstudio/repo -w /home/rstudio/repo \
-#    rocker/verse:3.4.3 \
-#    R -e 'lapply(list.files(pattern=".*.Rmd", recursive=TRUE), rmarkdown::render)'
