@@ -25,7 +25,6 @@ Depends:
     maps,
     maptools,
     maxnet,
-    ncdf4,
     raster,
     readxl,
     rgbif,
