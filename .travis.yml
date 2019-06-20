@@ -3,3 +3,5 @@
 
 language: R
 cache: packages
+before_install:
+    - sudo apt-get install libnetcdf-dev -y
