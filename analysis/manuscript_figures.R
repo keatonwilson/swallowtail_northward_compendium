@@ -1,7 +1,7 @@
 #Manuscript Figures
 #Keaton Wilson
 #keatonwilson@me.com
-#2019-05-14
+#2019-06-19
 
 # Packages ----------------------------------------------------------------
 #packages
@@ -24,9 +24,9 @@ library(ggridges)
 # Loading Data ------------------------------------------------------------
 
 #Loading in raw occurence data
-swallowtail = read_csv("./data/swallowtail_data.csv")
+swallowtail = read_csv("./data/raw_data/swallowtail_data.csv")
 swallowtail = swallowtail[,-1] %>%
-  select(longitude, latitude, date, year, time_frame)
+  dplyr::select(longitude, latitude, date, year, time_frame)
 
 swallowtail_t1 = swallowtail %>%
   filter(time_frame == "T1")
@@ -35,7 +35,7 @@ swallowtail_t2 = swallowtail %>%
   filter(time_frame == "T2")
 
 #hostplant
-hostplant = read_csv("./data/hostplant_data.csv")
+hostplant = read_csv("./data/raw_data/hostplant_data.csv")
 hostplant = hostplant[,-1]
 
 # #bioclim environmental variables
@@ -45,8 +45,8 @@ hostplant = hostplant[,-1]
 #                                 path = "./data/")
 
 #Environmental Data 
-bv_t1 = raster::brick("./data/terraclim/biovar_avg_t1.grd")
-bv_t2 = raster::brick("./data/terraclim/biovar_avg_t2.grd")
+bv_t1 = raster::brick("./data/raw_data/biovar_avg_t1.grd")
+bv_t2 = raster::brick("./data/raw_data/biovar_avg_t2.grd")
 
 #renaming
 names_seq = paste("Bio",seq(1:19), sep = "")
@@ -62,14 +62,14 @@ geographic.extent <- extent(x = c(min_lon_swallowtail, max_lon_swallowtail, min_
 
 
 #Loading in model objects
-mx_best_st_t1 = readRDS("./models/full_best_st_t1.rds")
-mx_best_st_t2 = readRDS("./models/full_best_st_t2.rds")
-mx_best_hp_1_t2 = readRDS("./models/full_best_hp_1_t2.rds")
-mx_best_hp_1_t1 = readRDS("./models/full_best_hp_1_t1.rds")
-mx_best_hp_2_t2 = readRDS("./models/full_best_hp_2_t2.rds")
-mx_best_hp_2_t1 = readRDS("./models/full_best_hp_2_t1.rds")
-mx_best_hp_3_t2 = readRDS("./models/full_best_hp_3_t2.rds")
-mx_best_hp_3_t1 = readRDS("./models/full_best_hp_3_t1.rds")
+mx_best_st_t1 = readRDS("./data/models/swallowtail_t1.rds")
+mx_best_st_t2 = readRDS("./data/models/swallowtail_t2.rds")
+mx_best_hp_1_t2 = readRDS("./data/models/hostplant_1_t1.rds")
+mx_best_hp_1_t1 = readRDS("./data/models/hostplant_1_t2.rds")
+mx_best_hp_2_t2 = readRDS("./data/models/hostplant_2_t1.rds")
+mx_best_hp_2_t1 = readRDS("./data/models/hostplant_2_t2.rds")
+mx_best_hp_3_t2 = readRDS("./data/models/hostplant_3_t1.rds")
+mx_best_hp_3_t1 = readRDS("./data/models/hostplant_3_t.rds")
 
 # Geographic Mapping Data ---------------------------------------
 
@@ -96,7 +96,7 @@ can_mapping = can[match(toupper(c("Ontario", "Québec", "New Brunswick", "Prince
 simple_map_can = gSimplify(can_mapping, tol = 0.01, topologyPreserve = TRUE)
 
 #Great lakes issues
-lakes <- rgdal::readOGR("./data/10m_physical/ne_10m_lakes.shp")
+lakes <- rgdal::readOGR("./data/raw_data/ne_10m_lakes/ne_10m_lakes.shp")
 lakes = lakes[lakes$scalerank==0,]
 lakes = crop(lakes, geographic.extent)
 
@@ -165,14 +165,16 @@ colnames(pred_sp_df_hp_3_t2) <- c("value", "x", "y")
 #Threshold maps
 
 #Loading the evaluate objects from the model building script
-ev_st_t1 = readRDS("./data/ev_st_t1.RDS")
-ev_st_t2 = readRDS("./data/ev_st_t2.RDS")
-ev_hp_1_t1 = readRDS("./data/ev_hp_1_t1.RDS")
-ev_hp_1_t2 = readRDS("./data/ev_hp_1_t2.RDS")
-ev_hp_2_t1 = readRDS("./data/ev_hp_2_t1.RDS")
-ev_hp_2_t2 = readRDS("./data/ev_hp_2_t2.RDS")
-ev_hp_3_t1 = readRDS("./data/ev_hp_3_t1.RDS")
-ev_hp_3_t2 = readRDS("./data/ev_hp_3_t2.RDS")
+evaluations = readRDS("./data/models/evaluations.rds")
+
+ev_st_t1 = evaluations[[1]]
+ev_st_t2 = evaluations[[2]]
+ev_hp_1_t1 = evaluations[[3]]
+ev_hp_1_t2 = evaluations[[4]]
+ev_hp_2_t1 = evaluations[[5]]
+ev_hp_2_t2 = evaluations[[6]]
+ev_hp_3_t1 = evaluations[[7]]
+ev_hp_3_t2 = evaluations[[8]]
 
 #finding the threshold for presence/absence for each model
 st_t1_threshold = threshold(ev_st_t1, 'spec_sens')

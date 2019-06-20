@@ -1,7 +1,7 @@
 #blockCV and Modeling Script for Swallowtail and hostplant data
 #Keaton Wilson
 #keatonwilson@me.com
-#2019-03-21
+#2019-06-19
 
 #libraries
 library(blockCV)
@@ -11,19 +11,18 @@ library(maxnet)
 library(dismo)
 library(ENMeval)
 
-
 # Data Preparation --------------------------------------------------------
 #setting seed for reproducibility down the line
 set.seed(42)
 
 #importing swallowtail, hostplant and environmental data
 #butterfly
-swallowtail = read_csv("./data/swallowtail_data.csv")
+swallowtail = read_csv("./data/raw_data/swallowtail_data.csv")
 swallowtail = swallowtail[,-1] %>%
   dplyr::select(longitude, latitude, date, year, time_frame)
 
 #hostplants
-hostplant = read_csv("./data/hostplant_data.csv")
+hostplant = read_csv("./data/raw_data/hostplant_data.csv")
 hostplant = hostplant[,-1]
 
 hostplant_1 = hostplant %>%
@@ -35,661 +34,153 @@ hostplant_2 = hostplant %>%
 hostplant_3 = hostplant %>%
   filter(str_detect(name, "Ptelea trifoliata"))
 
-#bioclim environmental variables
-# bioclim.data <- raster::getData(name = "worldclim",
-#                                 var = "bio",
-#                                 res = 2.5,
-#                                 path = "./data/")
+#using the custom prep_data function to ready the data for blockCV
+source("./R/prep_data_func.R")
 
-# bioclim.data = crop(bioclim.data, geographic.extent)
+swallowtail_prepared_data = prep_data(swallowtail)
+hostplant1_prepared_data = prep_data(hostplant_1)
+hostplant2_prepared_data = prep_data(hostplant_2)
+hostplant3_prepared_data = prep_data(hostplant_3)
 
-#Environmental Data 
-bv_t1 = raster::brick("./data/terraclim/biovar_avg_t1.grd")
-bv_t2 = raster::brick("./data/terraclim/biovar_avg_t2.grd")
+#Merging all the mini-lists into a large list of dataframes
+prepared_data_master = c(swallowtail_prepared_data, 
+                         hostplant1_prepared_data, 
+                         hostplant2_prepared_data, 
+                         hostplant3_prepared_data)
 
-#renaming
-names_seq = paste("Bio",seq(1:19), sep = "")
-names(bv_t1) = names_seq
-names(bv_t2) = names_seq
+names(prepared_data_master) = c("st_t1", "st_t2", "hp1_t1", "hp1_t2",
+                                "hp2_t1", "hp2_t2", "hp3_t1", "hp3_t2")
 
-# Determine geographic extent of our data
-max_lat_swallowtail <- ceiling(max(swallowtail$latitude))
-min_lat_swallowtail <- floor(min(swallowtail$latitude))
-max_lon_swallowtail <- ceiling(max(swallowtail$longitude))
-min_lon_swallowtail <- floor(min(swallowtail$longitude))
-geographic.extent <- extent(x = c(min_lon_swallowtail, max_lon_swallowtail, min_lat_swallowtail, max_lat_swallowtail))
-
-# Crop bioclim data to geographic extent of swallowtails
-bv_t1 <- crop(x = bv_t1, y = geographic.extent)
-bv_t2 <- crop(x = bv_t2, y = geographic.extent)
-
-#Dividing host plant and swallowtail into respective time periods
-#We essentially will have 8 models (HP1T1, HP2T2, STT1, STT2, etc.)
-
-#swallowtail t1
-swallowtail_t1 = swallowtail %>%
-  filter(time_frame == "T1")
-
-#swallowtail t2
-swallowtail_t2 = swallowtail %>%
-  filter(time_frame == "T2")
-
-#hostplant 1 t1
-hostplant_1_t1 = hostplant_1 %>%
-  filter(time_frame == "T1")
-
-#hostplant 1 t2
-hostplant_1_t2 = hostplant_1 %>%
-  filter(time_frame == "T2")
-
-#hostplant 2 t1
-hostplant_2_t1 = hostplant_2 %>%
-  filter(time_frame == "T1")
-
-#hostplant 2 t2
-hostplant_2_t2 = hostplant_2 %>%
-  filter(time_frame == "T2")
-
-#hostplant 3 t1
-hostplant_3_t1 = hostplant_3 %>%
-  filter(time_frame == "T1")
-
-#hostplant 3 t2
-hostplant_3_t2 = hostplant_3 %>%
-  filter(time_frame == "T2")
-
-#QC
-glimpse(swallowtail_t1)
-glimpse(swallowtail_t2)
-glimpse(hostplant_1_t1)
-glimpse(hostplant_1_t2)
-glimpse(hostplant_2_t1)
-glimpse(hostplant_2_t2)
-glimpse(hostplant_3_t1)
-glimpse(hostplant_3_t2)
-
-
-#Generating background points
-#background data
-bg_swallowtail_t1 = dismo::randomPoints(bv_t1, 10000)
-colnames(bg_swallowtail_t1) = c("longitude", "latitude")
-
-bg_swallowtail_t2 = randomPoints(bv_t2, 10000)
-colnames(bg_swallowtail_t2) = c("longitude", "latitude")
-
-bg_hostplant_1_t1 = randomPoints(bv_t1, 10000)
-colnames(bg_hostplant_1_t1) = c("longitude", "latitude")
-
-bg_hostplant_1_t2 = randomPoints(bv_t2, 10000)
-colnames(bg_hostplant_1_t2) = c("longitude", "latitude")
-
-bg_hostplant_2_t1 = randomPoints(bv_t1, 10000)
-colnames(bg_hostplant_2_t1) = c("longitude", "latitude")
-
-bg_hostplant_2_t2 = randomPoints(bv_t2, 10000)
-colnames(bg_hostplant_2_t2) = c("longitude", "latitude")
-
-bg_hostplant_3_t1 = randomPoints(bv_t1, 10000)
-colnames(bg_hostplant_3_t1) = c("longitude", "latitude")
-
-bg_hostplant_3_t2 = randomPoints(bv_t2, 10000)
-colnames(bg_hostplant_3_t2) = c("longitude", "latitude")
-
-#Merging background and occurence data for blockCV
-df_st_t1 = data.frame(swallowtail_t1) %>%
-  mutate(pb = 1) %>%
-  dplyr::select(pb, longitude, latitude) %>%
-  bind_rows(data.frame(bg_swallowtail_t1) %>% 
-              mutate(pb = 0))  %>%
-  mutate(Species = as.integer(pb)) %>%
-  dplyr::select(-pb)
-
-df_st_t2 = data.frame(swallowtail_t2) %>%
-  mutate(pb = 1) %>%
-  dplyr::select(pb, longitude, latitude) %>%
-  bind_rows(data.frame(bg_swallowtail_t2) %>% 
-              mutate(pb = 0)) %>%
-  mutate(Species = as.integer(pb)) %>%
-  dplyr::select(-pb)
-
-#Hostplant 1
-df_hp_1_t1 = data.frame(hostplant_1_t1) %>%
-  mutate(pb = 1) %>%
-  dplyr::select(pb, longitude, latitude) %>%
-  bind_rows(data.frame(bg_hostplant_1_t1) %>% 
-              mutate(pb = 0)) %>%
-  mutate(Species = as.integer(pb)) %>%
-  dplyr::select(-pb)
-
-df_hp_1_t2 = data.frame(hostplant_1_t2) %>%
-  mutate(pb = 1) %>%
-  dplyr::select(pb, longitude, latitude) %>%
-  bind_rows(data.frame(bg_hostplant_1_t2) %>% 
-              mutate(pb = 0)) %>%
-  mutate(Species = as.integer(pb)) %>%
-  dplyr::select(-pb)
-
-#Hostplant 2
-df_hp_2_t1 = data.frame(hostplant_2_t1) %>%
-  mutate(pb = 1) %>%
-  dplyr::select(pb, longitude, latitude) %>%
-  bind_rows(data.frame(bg_hostplant_2_t1) %>% 
-              mutate(pb = 0)) %>%
-  mutate(Species = as.integer(pb)) %>%
-  dplyr::select(-pb)
-
-df_hp_2_t2 = data.frame(hostplant_2_t2) %>%
-  mutate(pb = 1) %>%
-  dplyr::select(pb, longitude, latitude) %>%
-  bind_rows(data.frame(bg_hostplant_2_t2) %>% 
-              mutate(pb = 0)) %>%
-  mutate(Species = as.integer(pb)) %>%
-  dplyr::select(-pb)
-
-#Hostplant 3
-df_hp_3_t1 = data.frame(hostplant_3_t1) %>%
-  mutate(pb = 1) %>%
-  dplyr::select(pb, longitude, latitude) %>%
-  bind_rows(data.frame(bg_hostplant_3_t1) %>% 
-              mutate(pb = 0)) %>%
-  mutate(Species = as.integer(pb)) %>%
-  dplyr::select(-pb)
-
-df_hp_3_t2 = data.frame(hostplant_3_t2) %>%
-  mutate(pb = 1) %>%
-  dplyr::select(pb, longitude, latitude) %>%
-  bind_rows(data.frame(bg_hostplant_3_t2) %>% 
-              mutate(pb = 0)) %>%
-  mutate(Species = as.integer(pb)) %>%
-  dplyr::select(-pb)
-
-#Spatialpoints
-#Swallowtail
-dfspstt1 = SpatialPointsDataFrame(df_st_t1[,c("longitude","latitude")], 
-                                  df_st_t1, 
-                                  proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
-
-dfspstt2 = SpatialPointsDataFrame(df_st_t2[,c("longitude","latitude")], 
-                                  df_st_t2, 
-                                  proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
-
-#Hostplant 1
-dfsphp1t1 = SpatialPointsDataFrame(df_hp_1_t1[,c("longitude","latitude")], 
-                                  df_hp_1_t1, 
-                                  proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
-dfsphp1t2 = SpatialPointsDataFrame(df_hp_1_t2[,c("longitude","latitude")], 
-                                  df_hp_1_t2, 
-                                  proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
-
-#Hostplant 2
-dfsphp2t1 = SpatialPointsDataFrame(df_hp_2_t1[,c("longitude","latitude")], 
-                                   df_hp_2_t1, 
-                                   proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
-dfsphp2t2 = SpatialPointsDataFrame(df_hp_2_t2[,c("longitude","latitude")], 
-                                   df_hp_2_t2, 
-                                   proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
-
-#Hostplant 2
-dfsphp3t1 = SpatialPointsDataFrame(df_hp_3_t1[,c("longitude","latitude")], 
-                                   df_hp_3_t1, 
-                                   proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
-dfsphp3t2 = SpatialPointsDataFrame(df_hp_3_t2[,c("longitude","latitude")], 
-                                   df_hp_3_t2, 
-                                   proj4string = CRS("+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"))
-
-#Trying out spatial auto range function
-# sp_test <- spatialAutoRange(rasterLayer = biovar_t1,
-#                                   sampleNumber = 1000,
-#                                   border = NULL,
-#                                   showPlots = TRUE,
-#                                   plotVariograms = FALSE,
-#                                   doParallel = FALSE)
 
 # blockCV Train-Test Split for all 4 models ------------------------------------------------
-#Swallowtail
-sb_st_t1 <- spatialBlock(speciesData = dfspstt1,
-                         species = "Species",
-                         rasterLayer = bv_t1,
-                         theRange = 400000, # size of the blocks
-                         k = 5,
-                         selection = "random",
-                         iteration = 250, # find evenly dispersed folds
-                         biomod2Format = TRUE,
-                         xOffset = 0, # shift the blocks horizontally
-                         yOffset = 0,
-                         progress = T)
-
-sb_st_t2 <- spatialBlock(speciesData = dfspstt2,
-                         species = "Species",
-                         rasterLayer = bv_t2,
-                         theRange = 400000, # size of the blocks
-                         k = 5,
-                         selection = "random",
-                         iteration = 250, # find evenly dispersed folds
-                         biomod2Format = TRUE,
-                         xOffset = 0, # shift the blocks horizontally
-                         yOffset = 0,
-                         progress = T)
-
-#Hostplant 1
-sb_hp_1_t1 <- spatialBlock(speciesData = dfsphp1t1,
-                         species = "Species",
-                         rasterLayer = bv_t1,
-                         theRange = 400000, # size of the blocks
-                         k = 5,
-                         selection = "random",
-                         iteration = 250, # find evenly dispersed folds
-                         biomod2Format = TRUE,
-                         xOffset = 0, # shift the blocks horizontally
-                         yOffset = 0,
-                         progress = T)
-
-sb_hp_1_t2 <- spatialBlock(speciesData = dfsphp1t2,
-                         species = "Species",
-                         rasterLayer = bv_t2,
-                         theRange = 400000, # size of the blocks
-                         k = 5,
-                         selection = "random",
-                         iteration = 250, # find evenly dispersed folds
-                         biomod2Format = TRUE,
-                         xOffset = 0, # shift the blocks horizontally
-                         yOffset = 0,
-                         progress = T)
-
-#Hostplant 2
-sb_hp_2_t1 <- spatialBlock(speciesData = dfsphp2t1,
-                           species = "Species",
-                           rasterLayer = bv_t1,
-                           theRange = 400000, # size of the blocks
-                           k = 5,
-                           selection = "random",
-                           iteration = 250, # find evenly dispersed folds
-                           biomod2Format = TRUE,
-                           xOffset = 0, # shift the blocks horizontally
-                           yOffset = 0,
-                           progress = T)
-
-sb_hp_2_t2 <- spatialBlock(speciesData = dfsphp2t2,
-                           species = "Species",
-                           rasterLayer = bv_t2,
-                           theRange = 400000, # size of the blocks
-                           k = 5,
-                           selection = "random",
-                           iteration = 250, # find evenly dispersed folds
-                           biomod2Format = TRUE,
-                           xOffset = 0, # shift the blocks horizontally
-                           yOffset = 0,
-                           progress = T)
-
-#Hostplant 3
-sb_hp_3_t1 <- spatialBlock(speciesData = dfsphp3t1,
-                           species = "Species",
-                           rasterLayer = bv_t1,
-                           theRange = 400000, # size of the blocks
-                           k = 5,
-                           selection = "random",
-                           iteration = 250, # find evenly dispersed folds
-                           biomod2Format = TRUE,
-                           xOffset = 0, # shift the blocks horizontally
-                           yOffset = 0,
-                           progress = T)
-
-sb_hp_3_t2 <- spatialBlock(speciesData = dfsphp3t2,
-                           species = "Species",
-                           rasterLayer = bv_t2,
-                           theRange = 400000, # size of the blocks
-                           k = 5,
-                           selection = "random",
-                           iteration = 250, # find evenly dispersed folds
-                           biomod2Format = TRUE,
-                           xOffset = 0, # shift the blocks horizontally
-                           yOffset = 0,
-                           progress = T)
-
+#Running spatialBlock function over every dataframe in the list
+#
+block_list = list()
+for (i in 1:length(prepared_data_master)) {
+  if (str_detect(names(prepared_data_master[i]), "t1") == TRUE) {
+    raster = bv_t1 
+  } else {
+    raster = bv_t2
+  }
+  
+  block_list[[i]] = spatialBlock(speciesData = prepared_data_master[[i]],
+                               species = "Species",
+                               rasterLayer = raster,
+                               theRange = 400000,
+                               k = 5, 
+                               selection = "random", 
+                               iteration = 250, 
+                               biomod2Format = TRUE, 
+                               xOffset = 0, 
+                               yOffset = 0, 
+                               progress = T)
+}
 
 #Saving Spatial CV splits - these actually take a surprising amount of time to run, and are necessary building blocks for threshold maps in the figures script
-saveRDS(sb_st_t1, "./data/st_t1_sb.RDS")
-saveRDS(sb_st_t2, "./data/st_t2_sb.RDS")
-saveRDS(sb_hp_1_t1, "./data/hp_1_t1_sb.RDS")
-saveRDS(sb_hp_1_t2, "./data/hp_1_t2_sb.RDS")
-saveRDS(sb_hp_2_t1, "./data/hp_2_t1_sb.RDS")
-saveRDS(sb_hp_2_t2, "./data/hp_2_t2_sb.RDS")
-saveRDS(sb_hp_3_t1, "./data/hp_3_t1_sb.RDS")
-saveRDS(sb_hp_3_t2, "./data/hp_3_t2_sb.RDS")
-
-#Loading
-sb_st_t1 = readRDS("./data/st_t1_sb.RDS")
-sb_st_t2 = readRDS("./data/st_t2_sb.RDS")
-sb_hp_1_t1 = readRDS("./data/hp_1_t1_sb.RDS")
-sb_hp_1_t2 = readRDS("./data/hp_1_t2_sb.RDS")
-sb_hp_2_t1 = readRDS("./data/hp_2_t1_sb.RDS")
-sb_hp_2_t2 = readRDS("./data/hp_2_t2_sb.RDS")
-sb_hp_3_t1 = readRDS("./data/hp_3_t1_sb.RDS")
-sb_hp_3_t2 = readRDS("./data/hp_3_t2_sb.RDS")
+saveRDS(block_list, "./data/block_list.rds")
 
 #Getting dataframes to feed into the model (dropping NAs)
 #Swallowtail
-data_st_t1 = raster::extract(bv_t1, df_st_t1[,-3], df = TRUE) %>%
-  bind_cols(df_st_t1) %>%
-  drop_na() %>%
-  dplyr::select(-ID, Species, longitude, latitude, Bio1:Bio19)
 
-data_st_t2 = raster::extract(bv_t2, df_st_t2[,-3], df = TRUE) %>%
-  bind_cols(df_st_t2) %>%
-  drop_na() %>%
-  dplyr::select(-ID, Species, longitude, latitude, Bio1:Bio19)
-
-#Hostplant 1
-data_hp_1_t1 = raster::extract(bv_t1, df_hp_1_t1[,-3], df = TRUE) %>%
-  bind_cols(df_hp_1_t1) %>%
-  drop_na() %>%
-  dplyr::select(-ID, Species, longitude, latitude, Bio1:Bio19)
-
-data_hp_1_t2 = raster::extract(bv_t2, df_hp_1_t2[,-3], df = TRUE) %>%
-  bind_cols(df_hp_1_t2) %>%
-  drop_na() %>%
-  dplyr::select(-ID, Species, longitude, latitude, Bio1:Bio19)
-
-#Hostplant 2
-data_hp_2_t1 = raster::extract(bv_t1, df_hp_2_t1[,-3], df = TRUE) %>%
-  bind_cols(df_hp_2_t1) %>%
-  drop_na() %>%
-  dplyr::select(-ID, Species, longitude, latitude, Bio1:Bio19)
-
-data_hp_2_t2 = raster::extract(bv_t2, df_hp_2_t2[,-3], df = TRUE) %>%
-  bind_cols(df_hp_2_t2) %>%
-  drop_na() %>%
-  dplyr::select(-ID, Species, longitude, latitude, Bio1:Bio19)
-
-#Hostplant 3
-data_hp_3_t1 = raster::extract(bv_t1, df_hp_3_t1[,-3], df = TRUE) %>%
-  bind_cols(df_hp_3_t1) %>%
-  drop_na() %>%
- dplyr::select(-ID, Species, longitude, latitude, Bio1:Bio19)
-
-data_hp_3_t2 = raster::extract(bv_t2, df_hp_3_t2[,-3], df = TRUE) %>%
-  bind_cols(df_hp_3_t2) %>%
-  drop_na() %>%
-  dplyr::select(-ID, Species, longitude, latitude, Bio1:Bio19)
+model_data_list = list()
+for (i in 1:length(prepared_data_master)) {
+  if (str_detect(names(prepared_data_master[i]), "t1") == TRUE) {
+    raster = bv_t1 
+  } else {
+    raster = bv_t2
+  }
+  
+  model_data_list[[i]] = raster::extract(raster, prepared_data_master[[i]][,-3], df = TRUE) %>%
+    bind_cols(as.data.frame(prepared_data_master[[i]])) %>%
+    drop_na() %>%
+    dplyr::select(-ID, Species, longitude, latitude, Bio1:Bio19)
+}
 
 #vectors of presence-background
-#Swallowtail
-pb_st_t1 = data_st_t1$Species
-pb_st_t2 = data_st_t2$Species
-#hostplant 1
-pb_hp_1_t1 = data_hp_1_t1$Species
-pb_hp_1_t2 = data_hp_1_t2$Species
-#hostplant 2
-pb_hp_2_t1 = data_hp_2_t1$Species
-pb_hp_2_t2 = data_hp_2_t2$Species
-#hostplant 3
-pb_hp_3_t1 = data_hp_3_t1$Species
-pb_hp_3_t2 = data_hp_3_t2$Species
+pb_list = lapply(prepared_data_master,  function(x) '['(x, 3))
 
 #folds for each model
-#Swallowtail
-sb_st_t1_folds = sb_st_t1$folds
-sb_st_t2_folds = sb_st_t2$folds
-#HP1
-sb_hp_1_t1_folds = sb_hp_1_t1$folds
-sb_hp_1_t2_folds = sb_hp_1_t2$folds
-#HP2
-sb_hp_2_t1_folds = sb_hp_2_t1$folds
-sb_hp_2_t2_folds = sb_hp_2_t2$folds
-#HP3
-sb_hp_3_t1_folds = sb_hp_3_t1$folds
-sb_hp_3_t2_folds = sb_hp_3_t2$folds
+fold_list = lapply(block_list, function(x) '[['(x, 1))
 
-#Breaking into training and testing 
-#Swallowtail
-for(k in 1:length(sb_st_t1_folds)){
-  pb_st_t1_train_index <- unlist(sb_st_t1_folds[[k]][1]) # extract the training set indices
-  pb_st_t1_test_index <- unlist(sb_st_t1_folds[[k]][2]) # extract the test set indices
+#Writing a function that unlists and combines all training and test indices for each species-time period combination
+extract_index = function(list_of_folds = NULL) {
+for(k in 1:length(list_of_folds)){
+  train_index <- unlist(list_of_folds[[k]][1]) # extract the training set indices
+  test_index <- unlist(list_of_folds[[k]][2])# extract the test set indices
+}
+  mini_list = list(train_index, test_index)
+  mini_list
 }
 
-for(k in 1:length(sb_st_t2_folds)){
-  pb_st_t2_train_index <- unlist(sb_st_t2_folds[[k]][1]) # extract the training set indices
-  pb_st_t2_test_index <- unlist(sb_st_t2_folds[[k]][2]) # extract the test set indices
-}
-#HP1
+#Applying the function to the list of folds
+train_test_index_list = lapply(fold_list, extract_index)
 
-for(k in 1:length(sb_hp_1_t1_folds)){
-  pb_hp_1_t1_train_index <- unlist(sb_hp_1_t1_folds[[k]][1]) # extract the training set indices
-  pb_hp_1_t1_test_index <- unlist(sb_hp_1_t1_folds[[k]][2]) # extract the test set indices
-}
-
-for(k in 1:length(sb_hp_1_t2_folds)){
-  pb_hp_1_t2_train_index <- unlist(sb_hp_1_t2_folds[[k]][1]) # extract the training set indices
-  pb_hp_1_t2_test_index <- unlist(sb_hp_1_t2_folds[[k]][2]) # extract the test set indices
-}
-#HP2
-
-for(k in 1:length(sb_hp_2_t1_folds)){
-  pb_hp_2_t1_train_index <- unlist(sb_hp_2_t1_folds[[k]][1]) # extract the training set indices
-  pb_hp_2_t1_test_index <- unlist(sb_hp_2_t1_folds[[k]][2]) # extract the test set indices
+train_test_data_list = list()
+for (i in 1:length(model_data_list)) {
+    train_index = train_test_index_list[[i]][[1]]
+    test_index = train_test_index_list[[i]][[2]]
+  
+    train_data = model_data_list[[i]][train_index,]
+    test_data = model_data_list[[i]][test_index,]
+    
+    mini_list = list(train_data, test_data)
+    train_test_data_list[[i]] = mini_list
 }
 
-for(k in 1:length(sb_hp_2_t2_folds)){
-  pb_hp_2_t2_train_index <- unlist(sb_hp_2_t2_folds[[k]][1]) # extract the training set indices
-  pb_hp_2_t2_test_index <- unlist(sb_hp_2_t2_folds[[k]][2]) # extract the test set indices
+str(train_test_data_list)
+
+#Adding on T1, T2 designations
+for (i in 1:length(train_test_data_list)) {
+  for (j in 1:length(train_test_data_list[[i]])) {
+    if (j == 1) {
+      train_test_data_list[[i]][[j]]$time_period = 1
+    } else {
+      train_test_data_list[[i]][[j]]$time_period = 2
+    }
+  }
 }
-#HP3
-
-for(k in 1:length(sb_hp_3_t1_folds)){
-  pb_hp_3_t1_train_index <- unlist(sb_hp_3_t1_folds[[k]][1]) # extract the training set indices
-  pb_hp_3_t1_test_index <- unlist(sb_hp_3_t1_folds[[k]][2]) # extract the test set indices
-}
-
-for(k in 1:length(sb_hp_3_t2_folds)){
-  pb_hp_3_t2_train_index <- unlist(sb_hp_3_t2_folds[[k]][1]) # extract the training set indices
-  pb_hp_3_t2_test_index <- unlist(sb_hp_3_t2_folds[[k]][2]) # extract the test set indices
-}
-
-#training and testing
-#Swallowtail
-pb_st_t1_train_data = data_st_t1[pb_st_t1_train_index,]
-pb_st_t1_test_data = data_st_t1[pb_st_t1_test_index,]
-
-pb_st_t2_train_data = data_st_t2[pb_st_t2_train_index,]
-pb_st_t2_test_data = data_st_t2[pb_st_t2_test_index,]
-
-#HP1
-pb_hp_1_t1_train_data = data_hp_1_t1[pb_hp_1_t1_train_index,]
-pb_hp_1_t1_test_data = data_hp_1_t1[pb_hp_1_t1_test_index,]
-
-pb_hp_1_t2_train_data = data_hp_1_t2[pb_hp_1_t2_train_index,]
-pb_hp_1_t2_test_data = data_hp_1_t2[pb_hp_1_t2_test_index,]
-
-#HP2
-pb_hp_2_t1_train_data = data_hp_2_t1[pb_hp_2_t1_train_index,]
-pb_hp_2_t1_test_data = data_hp_2_t1[pb_hp_2_t1_test_index,]
-
-pb_hp_2_t2_train_data = data_hp_2_t2[pb_hp_2_t2_train_index,]
-pb_hp_2_t2_test_data = data_hp_2_t2[pb_hp_2_t2_test_index,]
-
-#HP3
-pb_hp_3_t1_train_data = data_hp_3_t1[pb_hp_3_t1_train_index,]
-pb_hp_3_t1_test_data = data_hp_3_t1[pb_hp_3_t1_test_index,]
-
-pb_hp_3_t2_train_data = data_hp_3_t2[pb_hp_3_t2_train_index,]
-pb_hp_3_t2_test_data = data_hp_3_t2[pb_hp_3_t2_test_index,]
-
-
-#Quality control
-dim(pb_st_t1_train_data)
-dim(pb_st_t1_test_data) #Looks good - test data is about 20%
-
-#Formatting occurences and background for sending to ENMevaluate
-#Train and test for swallowtail t1
-p_st_t1_train = pb_st_t1_train_data %>%
-  filter(Species == 1) %>%
-  dplyr::select(longitude, latitude)
-
-p_st_t1_test = pb_st_t1_test_data %>%
-  filter(Species == 1) %>%
-  dplyr::select(longitude, latitude)
-
-#train and test for swallowtail t2
-p_st_t2_train = pb_st_t2_train_data %>%
-  filter(Species == 1) %>%
-  dplyr::select(longitude, latitude)
-
-p_st_t2_test = pb_st_t2_test_data %>%
-  filter(Species == 1) %>%
-  dplyr::select(longitude, latitude)
-
-#train and test for hostplant 1 t1
-p_hp_1_t1_train = pb_hp_1_t1_train_data %>%
-  filter(Species == 1) %>%
-  dplyr::select(longitude, latitude)
-
-p_hp_1_t1_test = pb_hp_1_t2_train_data %>%
-  filter(Species == 1) %>%
-  dplyr::select(longitude, latitude)
-
-#train and test for hostplant 1 t2
-p_hp_1_t2_train = pb_hp_1_t2_train_data %>%
-  filter(Species == 1) %>%
-  dplyr::select(longitude, latitude)
-
-p_hp_1_t2_test = pb_hp_1_t2_test_data %>%
-  filter(Species == 1) %>%
-  dplyr::select(longitude, latitude)
-
-#train and test for hostplant 2 t1
-p_hp_2_t1_train = pb_hp_2_t1_train_data %>%
-  filter(Species == 1) %>%
-  dplyr::select(longitude, latitude)
-
-p_hp_2_t1_test = pb_hp_2_t2_train_data %>%
-  filter(Species == 1) %>%
-  dplyr::select(longitude, latitude)
-
-#train and test for hostplant 2 t2
-p_hp_2_t2_train = pb_hp_2_t2_train_data %>%
-  filter(Species == 1) %>%
-  dplyr::select(longitude, latitude)
-
-p_hp_2_t2_test = pb_hp_2_t2_test_data %>%
-  filter(Species == 1) %>%
-  dplyr::select(longitude, latitude)
-
-#train and test for hostplant 3 t1
-p_hp_3_t1_train = pb_hp_3_t1_train_data %>%
-  filter(Species == 1) %>%
-  dplyr::select(longitude, latitude)
-
-p_hp_3_t1_test = pb_hp_3_t2_train_data %>%
-  filter(Species == 1) %>%
-  dplyr::select(longitude, latitude)
-
-#train and test for hostplant 3 t2
-p_hp_3_t2_train = pb_hp_3_t2_train_data %>%
-  filter(Species == 1) %>%
-  dplyr::select(longitude, latitude)
-
-p_hp_3_t2_test = pb_hp_3_t2_test_data %>%
-  filter(Species == 1) %>%
-  dplyr::select(longitude, latitude)
-
 
 # Modeling ----------------------------------------------------------------
 if (Sys.getenv("JAVA_HOME")!="")
   Sys.setenv(JAVA_HOME="")
 library(rJava)
 
+model_func = function(data = NULL) {
+  data_occ = data[[1]] %>%  #Generating occurence lat long
+    filter(Species == 1) %>%
+    dplyr::select(longitude, latitude)
+  
+  data_bg = data[[1]] %>% #Generating background lat long
+    filter(Species == 0) %>%
+    dplyr::select(longitude, latitude)
+  
+  if (data[[1]]$time_period[1] == 1) { #Setting the appropriate environmental layer for the time period
+    env_data = bv_t1
+  } else {
+    env_data = bv_t2
+  }
+  
+  #Running the model
+  eval = ENMevaluate(occ = data_occ, 
+                     bg.coords = data_bg,
+                     env = env_data,
+                     method = 'randomkfold', 
+                     kfolds = 5, 
+                     algorithm = 'maxent.jar')
+  eval
+}
 
-#Swallowtail t1 
-eval_st_t1 = ENMevaluate(occ = p_st_t1_train, 
-                         bg.coords = bg_swallowtail_t1, 
-                         env = bv_t1, 
-                         method = 'randomkfold', 
-                         kfolds = 5, 
-                         algorithm = 'maxent.jar')
-#saving model objects
-saveRDS(eval_st_t1, "./models/eval_st_t1.rds")
-#Swallowtail t2
-eval_st_t2 = ENMevaluate(occ = p_st_t2_train, 
-                         bg.coords = bg_swallowtail_t2, 
-                         env = bv_t2, 
-                         method = 'randomkfold', 
-                         kfolds = 5, 
-                         algorithm = 'maxent.jar')
+start = Sys.time()
+#Running the model function over the list of data
+big_model_list = lapply(train_test_data_list, model_func)
 
-#saving model objects
-saveRDS(eval_st_t2, "./models/eval_st_t2.rds")
+#Saving this bad boy
+saveRDS(big_model_list, "./data/models/model_list.rds")
 
-#Hostplant 1 t1
-eval_hp_1_t1 = ENMevaluate(occ = p_hp_1_t1_train, 
-                         bg.coords = bg_hostplant_1_t1, 
-                         env = bv_t1, 
-                         method = 'randomkfold', 
-                         kfolds = 5, 
-                         algorithm = 'maxent.jar')
-saveRDS(eval_hp_1_t1, "./models/eval_hp_1_t1.rds")
-
-#Hostplant 1 t2
-eval_hp_1_t2 = ENMevaluate(occ = p_hp_1_t2_train, 
-                         bg.coords = bg_hostplant_1_t2, 
-                         env = bv_t2, 
-                         method = 'randomkfold', 
-                         kfolds = 5, 
-                         algorithm = 'maxent.jar')
-
-saveRDS(eval_hp_1_t2, "./models/eval_hp_1_t2.rds")
-
-#Hostplant 2 t1
-eval_hp_2_t1 = ENMevaluate(occ = p_hp_2_t1_train, 
-                         bg.coords = bg_hostplant_2_t1, 
-                         env = bv_t1, 
-                         method = 'randomkfold', 
-                         kfolds = 5, 
-                         algorithm = 'maxent.jar')
-saveRDS(eval_hp_2_t1, "./models/eval_hp_2_t1.rds")
-#Hostplant 2 t2
-eval_hp_2_t2 = ENMevaluate(occ = p_hp_2_t2_train, 
-                         bg.coords = bg_hostplant_2_t2, 
-                         env = bv_t2, 
-                         method = 'randomkfold', 
-                         kfolds = 5, 
-                         algorithm = 'maxent.jar')
-
-
-saveRDS(eval_hp_2_t2, "./models/eval_hp_2_t2.rds")
-
-#Hostplant 3 t1
-eval_hp_3_t1 = ENMevaluate(occ = p_hp_3_t1_train, 
-                         bg.coords = bg_hostplant_3_t1, 
-                         env = bv_t1, 
-                         method = 'randomkfold', 
-                         kfolds = 5, 
-                         algorithm = 'maxent.jar')
-saveRDS(eval_hp_3_t1, "./models/eval_hp_3_t1.rds")
-#Hostplant 3 t2
-eval_hp_3_t2 = ENMevaluate(occ = p_hp_3_t2_train, 
-                         bg.coords = bg_hostplant_3_t2, 
-                         env = bv_t2, 
-                         method = 'randomkfold', 
-                         kfolds = 5, 
-                         algorithm = 'maxent.jar')
-
-
-saveRDS(eval_hp_3_t2, "./models/eval_hp_3_t2.rds")
-
-
+end = Sys.time()
 # Model Evaluation --------------------------------------------------------
 
 #Function to build set of evaluation plots - just plug in the appropriate eval model object from above
-
-#reading in models - otherwise things will take too much time
-eval_st_t1 = readRDS("./models/eval_st_t1.rds")
-eval_st_t2 = readRDS("./models/eval_st_t2.rds")
-eval_hp_1_t1 = readRDS("./models/eval_hp_1_t1.rds")
-eval_hp_1_t2 = readRDS("./models/eval_hp_1_t2.rds")
-eval_hp_2_t1 = readRDS("./models/eval_hp_2_t1.rds")
-eval_hp_2_t2 = readRDS("./models/eval_hp_2_t2.rds")
-eval_hp_3_t1 = readRDS("./models/eval_hp_3_t1.rds")
-eval_hp_3_t2 = readRDS("./models/eval_hp_3_t2.rds")
 
 eval_plots = function(eval_object = NULL) {
   par(mfrow=c(2,3))
@@ -704,186 +195,108 @@ eval_plots = function(eval_object = NULL) {
 }
 
 #Evaluation plots
-eval_plots(eval_st_t1)
-eval_plots(eval_st_t2)
-eval_plots(eval_hp_1_t1)
-eval_plots(eval_hp_1_t2)
-eval_plots(eval_hp_2_t1)
-eval_plots(eval_hp_2_t2)
-eval_plots(eval_hp_3_t1)
-eval_plots(eval_hp_3_t2)
+#Feed in a list of models and it outputs and saves the evaluation plots for each one
+for (i in 1:length(big_model_list)) {
+  name = paste("eval_plot", i, sep = "_")
+  png(filename = paste0("./output/", name, ".png"), 
+      width = 1080, height = 720)
+  plot = eval_plots(big_model_list[[i]])
+  dev.off()
+}
 
 #Picking the best model based on highest AUC for each set
 #Pulling out indices of the "best" model based on AUC scores - if there are two models that are equal, it pulls the first.
-best_index_st_t1 = as.numeric(row.names(eval_st_t1@results[which(eval_st_t1@results$avg.test.AUC== max(eval_st_t1@results$avg.test.AUC)),]))[1]
 
-best_index_st_t2 = as.numeric(row.names(eval_st_t2@results[which(eval_st_t2@results$avg.test.AUC== max(eval_st_t2@results$avg.test.AUC)),]))[1]
+model_selection_index_list = list()
 
-best_index_hp_1_t1 = as.numeric(row.names(eval_hp_1_t1@results[which(eval_hp_1_t1@results$avg.test.AUC== max(eval_hp_1_t1@results$avg.test.AUC)),]))[1]
+for (i in 1:length(big_model_list)) {
+  model_selection_index_list[[i]] = as.numeric(row.names(big_model_list[[i]]@results[which(big_model_list[[i]]@results$avg.test.AUC== max(big_model_list[[i]]@results$avg.test.AUC)),]))[1]
+}
 
-best_index_hp_1_t2 = as.numeric(row.names(eval_hp_1_t2@results[which(eval_hp_1_t2@results$avg.test.AUC== max(eval_hp_1_t2@results$avg.test.AUC)),]))[1]
+best_model_list = list()
+for (i in 1:length(big_model_list)) {
+  index = model_selection_index_list[[i]]
+  model = big_model_list[[i]]@models[[index]]
+  best_model_list[[i]] = model
+}
 
-best_index_hp_2_t1 = as.numeric(row.names(eval_hp_2_t1@results[which(eval_hp_2_t1@results$avg.test.AUC== max(eval_hp_2_t1@results$avg.test.AUC)),]))[1]
+#combining models and data into a master list
 
-best_index_hp_2_t2 = as.numeric(row.names(eval_hp_2_t2@results[which(eval_hp_2_t2@results$avg.test.AUC== max(eval_hp_2_t2@results$avg.test.AUC)),]))[1]
+master_list = list()
+for (i in 1:length(train_test_data_list)) {
+  master_list[[i]] = append(train_test_data_list[[i]], best_model_list[[i]])
+}
+#Generating evaluate objects on test data
 
-best_index_hp_3_t1 = as.numeric(row.names(eval_hp_3_t1@results[which(eval_hp_3_t1@results$avg.test.AUC== max(eval_hp_3_t1@results$avg.test.AUC)),]))[1]
+evaluate_models = function(master_list_sub = NULL) {
+  test_data_occ = master_list_sub[[2]] %>%
+    filter(Species == 1) %>%
+    dplyr::select(longitude, latitude)
+  
+  bg_data = master_list_sub[[2]] %>%
+    filter(Species == 0) %>%
+    dplyr::select(longitude, latitude)
+  
+  if (master_list_sub[[2]]$time_period[1] == 1) {
+    env_data = bv_t1
+  } else {
+    env_data = bv_t2
+  }
+  
+  model_sub = master_list_sub[[3]]
+  
+  ev = evaluate(test_data_occ, a = bg_data, model = model_sub, x = env_data)
+  ev
+}
 
-best_index_hp_3_t2 = as.numeric(row.names(eval_hp_3_t2@results[which(eval_hp_3_t2@results$avg.test.AUC== max(eval_hp_3_t2@results$avg.test.AUC)),]))[1]
+evaluations = lapply(master_list, evaluate_models)
 
-
-#Using indices generated above to pull out the model objects
-best_st_t1 = eval_st_t1@models[[best_index_st_t1]]
-best_st_t2 = eval_st_t2@models[[best_index_st_t2]]
-best_hp_1_t1 = eval_hp_1_t1@models[[best_index_hp_1_t1]]
-best_hp_1_t2 = eval_hp_1_t2@models[[best_index_hp_1_t2]]
-best_hp_2_t1 = eval_hp_2_t1@models[[best_index_hp_2_t1]]
-best_hp_2_t2 = eval_hp_2_t2@models[[best_index_hp_2_t2]]
-best_hp_3_t1 = eval_hp_3_t1@models[[best_index_hp_3_t1]]
-best_hp_3_t2 = eval_hp_3_t2@models[[best_index_hp_3_t2]]
-
-#Evaluate on test data
-ev_st_t1 = evaluate(p_st_t1_test, a = bg_swallowtail_t1,  model = best_st_t1, x = bv_t1)
-ev_st_t2 = evaluate(p_st_t2_test, a = bg_swallowtail_t2,  model = best_st_t2, x = bv_t2)
-ev_hp_1_t1 = evaluate(p_hp_1_t1_test, a = bg_hostplant_1_t1,  model = best_hp_1_t1, x = bv_t1)
-ev_hp_1_t2 = evaluate(p_hp_1_t2_test, a = bg_hostplant_1_t2, model = best_hp_1_t2, x = bv_t2)
-
-ev_hp_2_t1 = evaluate(p_hp_2_t1_test, a = bg_hostplant_2_t1,  model = best_hp_2_t1, x = bv_t1)
-ev_hp_2_t2 = evaluate(p_hp_2_t2_test, a = bg_hostplant_2_t2, model = best_hp_2_t2, x = bv_t2)
-
-ev_hp_3_t1 = evaluate(p_hp_3_t1_test, a = bg_hostplant_3_t1,  model = best_hp_3_t1, x = bv_t1)
-ev_hp_3_t2 = evaluate(p_hp_3_t2_test, a = bg_hostplant_3_t2, model = best_hp_3_t2, x = bv_t2)
-
-
-#Saving evaluate objects for threshold maps in the figure-building script
-saveRDS(ev_st_t1, "./data/ev_st_t1.RDS")
-saveRDS(ev_st_t2, "./data/ev_st_t2.RDS")
-saveRDS(ev_hp_1_t1, "./data/ev_hp_1_t1.RDS")
-saveRDS(ev_hp_1_t2, "./data/ev_hp_1_t2.rds")
-saveRDS(ev_hp_2_t1, "./data/ev_hp_2_t1.RDS")
-saveRDS(ev_hp_2_t2, "./data/ev_hp_2_t2.rds")
-saveRDS(ev_hp_3_t1, "./data/ev_hp_3_t1.RDS")
-saveRDS(ev_hp_3_t2, "./data/ev_hp_3_t2.rds")
+#Saving evaluations
+saveRDS(evaluations, file = "./data/models/evaluations.rds")
 
 # Selecting Final Models and Running on All Data --------------------------
 #Let's build final models
 
-#Swallowtail T1
-#Pulling out features
-auc_mod = eval_st_t1@results[best_index_st_t1,]
-FC_best = as.character(auc_mod$features[1])
-rm_best = auc_mod$rm
+full_model = function(models = NULL, full_data = NULL, best_model_index = NULL, name = NULL) {
+  auc_mod = models@results[best_model_index,]
+  FC_best = as.character(auc_mod$features[1])
+  rm_best = auc_mod$rm
+  maxent.args = ENMeval::make.args(RMvalues = rm_best, fc = FC_best)
+  
+  if (full_data$time_frame[1] == "T1") {
+    env_data = bv_t1
+  } else {
+    env_data = bv_t2
+  }
+  
+  full_mod = maxent(env_data, as.matrix(full_data[,1:2]), args = maxent.args[[1]])
+  saveRDS(full_mod, paste0("./data/models/", name, ".rds" ))
+  
+  full_mod
+}
 
-#setting maxent arguments
-maxent.args = ENMeval::make.args(RMvalues = rm_best, fc = FC_best)
+#Creating each master model
+swallowtail_t1 = full_model(models = big_model_list[[1]], best_model_index = model_selection_index_list[[1]], 
+           full_data = swallowtail %>% filter(time_frame == "T1"), name = "swallowtail_t1")
 
-#Full Swallowtail T1 Model
-mx_best_st_t1 = maxent(bv_t1, as.matrix(swallowtail_t1[,1:2]), args = maxent.args[[1]])
+swallowtail_t2 = full_model(models = big_model_list[[2]], best_model_index = model_selection_index_list[[2]], 
+                            full_data = swallowtail %>% filter(time_frame == "T2"), name = "swallowtail_t2")
 
-#save model
-saveRDS(mx_best_st_t1, "./models/full_best_st_t1.rds")
+hostplant_1_t1 = full_model(models = big_model_list[[3]], best_model_index = model_selection_index_list[[3]], 
+                            full_data = hostplant_1[,-1] %>% filter(time_frame == "T1"), name = "hostplant_1_t1")
 
-#Swallowtail T2
-#Pulling out features
-auc_mod = eval_st_t2@results[best_index_st_t2,]
-FC_best = as.character(auc_mod$features[1])
-rm_best = auc_mod$rm
+hostplant_1_t2 = full_model(models = big_model_list[[4]], best_model_index = model_selection_index_list[[4]], 
+                            full_data = hostplant_1[,-1] %>% filter(time_frame == "T2"), name = "hostplant_1_t2")
 
-#setting maxent arguments
-maxent.args = ENMeval::make.args(RMvalues = rm_best, fc = FC_best)
+hostplant_2_t1 = full_model(models = big_model_list[[5]], best_model_index = model_selection_index_list[[5]], 
+                            full_data = hostplant_2[,-1] %>% filter(time_frame == "T1"), name = "hostplant_2_t1")
 
-#Full Swallowtail T2 Model
-mx_best_st_t2 = maxent(bv_t2, as.matrix(swallowtail_t2[,1:2]), args = maxent.args[[1]])
+hostplant_2_t2 = full_model(models = big_model_list[[6]], best_model_index = model_selection_index_list[[6]], 
+                            full_data = hostplant_2[,-1] %>% filter(time_frame == "T2"), name = "hostplant_2_t2")
 
-#save model
-saveRDS(mx_best_st_t2, "./models/full_best_st_t2.rds")
+hostplant_3_t1 = full_model(models = big_model_list[[7]], best_model_index = model_selection_index_list[[7]], 
+                            full_data = hostplant_3[,-1] %>% filter(time_frame == "T1"), name = "hostplant_3_t1")
 
-#Hostplant 1 T1
-#Pulling out features
-auc_mod = eval_hp_1_t1@results[best_index_hp_1_t1,]
-FC_best = as.character(auc_mod$features[1])
-rm_best = auc_mod$rm
+hostplant_3_t2 = full_model(models = big_model_list[[8]], best_model_index = model_selection_index_list[[8]], 
+                            full_data = hostplant_3[,-1] %>% filter(time_frame == "T2"), name = "hostplant_3_t2")
 
-#setting maxent arguments
-maxent.args = ENMeval::make.args(RMvalues = rm_best, fc = FC_best)
-
-#Full Hostplant T1 Model
-mx_best_hp_1_t1 = maxent(bv_t1, as.matrix(hostplant_1_t1[,2:3]), args = maxent.args[[1]])
-
-#save model
-saveRDS(mx_best_hp_1_t1, "./models/full_best_hp_1_t1.rds")
-
-#Hostplant 1 T2
-#Pulling out features
-auc_mod = eval_hp_1_t2@results[best_index_hp_1_t2,]
-FC_best = as.character(auc_mod$features[1])
-rm_best = auc_mod$rm
-
-#setting maxent arguments
-maxent.args = ENMeval::make.args(RMvalues = rm_best, fc = FC_best)
-
-#Full Hostplant T2 Model
-mx_best_hp_1_t2 = maxent(bv_t2, as.matrix(hostplant_1_t2[,2:3]), args = maxent.args[[1]])
-
-#save model
-saveRDS(mx_best_hp_1_t2, "./models/full_best_hp_1_t2.rds")
-
-#Hostplant 2 T1
-#Pulling out features
-auc_mod = eval_hp_2_t1@results[best_index_hp_2_t1,]
-FC_best = as.character(auc_mod$features[1])
-rm_best = auc_mod$rm
-
-#setting maxent arguments
-maxent.args = ENMeval::make.args(RMvalues = rm_best, fc = FC_best)
-
-#Full Hostplant T1 Model
-mx_best_hp_2_t1 = maxent(bv_t1, as.matrix(hostplant_2_t1[,2:3]), args = maxent.args[[1]])
-
-#save model
-saveRDS(mx_best_hp_2_t1, "./models/full_best_hp_2_t1.rds")
-
-#Hostplant 2 T2
-#Pulling out features
-auc_mod = eval_hp_2_t2@results[best_index_hp_2_t2,]
-FC_best = as.character(auc_mod$features[1])
-rm_best = auc_mod$rm
-
-#setting maxent arguments
-maxent.args = ENMeval::make.args(RMvalues = rm_best, fc = FC_best)
-
-#Full Hostplant T2 Model
-mx_best_hp_2_t2 = maxent(bv_t2, as.matrix(hostplant_2_t2[,2:3]), args = maxent.args[[1]])
-
-#save model
-saveRDS(mx_best_hp_2_t2, "./models/full_best_hp_2_t2.rds")
-
-#Hostplant 3 T1
-#Pulling out features
-auc_mod = eval_hp_3_t1@results[best_index_hp_3_t1,]
-FC_best = as.character(auc_mod$features[1])
-rm_best = auc_mod$rm
-
-#setting maxent arguments
-maxent.args = ENMeval::make.args(RMvalues = rm_best, fc = FC_best)
-
-#Full Hostplant T1 Model
-mx_best_hp_3_t1 = maxent(bv_t1, as.matrix(hostplant_3_t1[,2:3]), args = maxent.args[[1]])
-
-#save model
-saveRDS(mx_best_hp_3_t1, "./models/full_best_hp_3_t1.rds")
-
-#Hostplant 3 T2
-#Pulling out features
-auc_mod = eval_hp_3_t2@results[best_index_hp_3_t2,]
-FC_best = as.character(auc_mod$features[1])
-rm_best = auc_mod$rm
-
-#setting maxent arguments
-maxent.args = ENMeval::make.args(RMvalues = rm_best, fc = FC_best)
-
-#Full Hostplant T2 Model
-mx_best_hp_3_t2 = maxent(bv_t2, as.matrix(hostplant_3_t2[,2:3]), args = maxent.args[[1]])
-
-#save model
-saveRDS(mx_best_hp_3_t2, "./models/full_best_hp_3_t2.rds")
